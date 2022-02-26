@@ -12,6 +12,10 @@
 #define HEAD_CH '@'
 #define FOOD_CH '0'
 
+#define COLOR_HEAD 1
+#define COLOR_BODY 2
+#define COLOR_FOOD 3
+
 #define UP -1
 #define DOWN 1
 #define LEFT -1
@@ -183,16 +187,9 @@ void *listen_keys() {
 void game_over(int w, int h) {
     nodelay(stdscr, false);
     char *msg = "Game Over";
+    char scr[9];
 
-    uint8_t score_cap = 9;
-    char scr[score_cap];
-
-    if (SCORE < 10) {
-        sprintf(scr, "score: 0%d", SCORE);
-    } else {
-        sprintf(scr, "score: %d", SCORE);
-    }
-
+    sprintf(scr, "score: %d", SCORE);
 
     clear();
     mvaddstr(h / 2, (w / 2) - strlen(msg), msg);
@@ -204,10 +201,15 @@ void game_over(int w, int h) {
 void draw_snake(struct SnakeNode *s) {
     char ch;
     while (true) {
-        if (s == NULL) return;
+        if (s == NULL) {
+            attroff(COLOR_PAIR(COLOR_BODY));
+            return;
+        }
 
+        attron(COLOR_PAIR(COLOR_BODY));
         ch = BODY_CH;
         if (s->is_head) {
+            attron(COLOR_PAIR(COLOR_HEAD));
             ch = HEAD_CH;
         }
 
@@ -218,7 +220,16 @@ void draw_snake(struct SnakeNode *s) {
 }
 
 void draw_food(struct Food *f) {
+    attron(COLOR_PAIR(COLOR_FOOD));
     mvaddch(f->pos.y, f->pos.x, FOOD_CH);
+    attroff(COLOR_PAIR(COLOR_FOOD));
+}
+
+void draw_info() {
+    char scr[9];
+
+    sprintf(scr, "score: %d", SCORE);
+    mvaddstr(2, 2, scr);
 }
 
 
@@ -227,6 +238,18 @@ int main() {
     struct Food *food = (struct Food *) malloc(sizeof(struct Food));
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w); // Init window resolution
+    initscr();
+
+    if (has_colors() == FALSE) {
+        panic("colors is not enabled in terminal");
+    }
+
+    start_color();
+    use_default_colors();
+
+    init_pair(COLOR_HEAD, COLOR_YELLOW, A_COLOR);
+    init_pair(COLOR_BODY, COLOR_GREEN, A_COLOR);
+    init_pair(COLOR_FOOD, COLOR_RED, A_COLOR);
 
     x = (int) (w.ws_col / 2);
     y = (int) (w.ws_row / 2);
@@ -311,6 +334,7 @@ int main() {
 
         draw_food(food);
         draw_snake(snake);
+        draw_info();
 
         refresh();
 
