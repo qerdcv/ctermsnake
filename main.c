@@ -49,10 +49,8 @@ void generate_food(struct SnakeNode *s, struct Food *f, int max_x, int max_y) {
     struct SnakeNode *tmp;
     while (true) {
         start:
-        x = (rand() %
-             (max_x + 1));
-        y = (rand() %
-             (max_y + 1));
+        x = rand() % max_x;
+        y = rand() % max_y;
         tmp = s;
 
         while (true) {
