@@ -190,8 +190,8 @@ void game_over(int w, int h) {
     sprintf(scr, "score: %d", SCORE);
 
     clear();
-    mvaddstr(h / 2, (w / 2) - strlen(msg), msg);
-    mvaddstr((h / 2) + 1, (w / 2) - strlen(scr), scr);
+    mvaddstr(h / 2, (w / 2) - (strlen(msg) / 2), msg);
+    mvaddstr((h / 2) + 1, (w / 2) - (strlen(scr) / 2), scr);
     refresh();
     getch();
 }
@@ -236,8 +236,15 @@ int main() {
     struct Food *food = (struct Food *) malloc(sizeof(struct Food));
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w); // Init window resolution
-    initscr();
 
+    // Init screen
+    initscr();
+    noecho();
+    curs_set(0);
+    nodelay(stdscr, true);
+    // ---------------------
+
+    // Init colors
     if (has_colors() == FALSE) {
         panic("colors is not enabled in terminal");
     }
@@ -248,6 +255,7 @@ int main() {
     init_pair(COLOR_HEAD, COLOR_YELLOW, A_COLOR);
     init_pair(COLOR_BODY, COLOR_GREEN, A_COLOR);
     init_pair(COLOR_FOOD, COLOR_RED, A_COLOR);
+    // -------------------------
 
     x = (int) (w.ws_col / 2);
     y = (int) (w.ws_row / 2);
@@ -263,17 +271,11 @@ int main() {
     pthread_detach(thread_id);
     // --------------------------------
 
-    // Init screen
-    initscr();
-    noecho();
-    curs_set(0);
-    nodelay(stdscr, true);
-    // -----------------
-
     // Init game
     generate_food(snake, food, w.ws_col, w.ws_row);
     // ---------
 
+    // main loop
     while (true) {
         // Handle keys
         switch (CURRENT_KEY) {
@@ -306,13 +308,10 @@ int main() {
             default:
                 break;
         }
-
         // ---------------
 
         // handle logic
-
-        // move snake
-        move_snake(snake, food, w.ws_row, w.ws_col);
+        move_snake(snake, food, w.ws_row, w.ws_col); // move snake
         if (is_collided(snake)) { // if it's collided itself - game over
             game_over(w.ws_col, w.ws_row);
             goto end;
@@ -320,22 +319,19 @@ int main() {
 
         if (snake->pos.x == food->pos.x && snake->pos.y == food->pos.y) { // if head is on food position
             SCORE++; // Increase score
-
             generate_food(snake, food, w.ws_col, w.ws_row); // Regenerate food
-            grow_snake(snake, w.ws_row, w.ws_col);
+            grow_snake(snake, w.ws_row, w.ws_col); // Grow snake
         }
-
         // ---------------------
 
         // Draw
         clear();
 
+        draw_info();
         draw_food(food);
         draw_snake(snake);
-        draw_info();
 
         refresh();
-
         // ------------------------
 
         // Sleep
