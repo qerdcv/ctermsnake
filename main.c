@@ -8,15 +8,15 @@
 #include <math.h>
 #include <string.h>
 
-#define FIELD_WIDTH 500
-#define FIELD_HEIGHT 500
+#define BODY_CH '#'
+#define HEAD_CH '@'
+#define FOOD_CH '0'
 
 #define UP -1
 #define DOWN 1
 #define LEFT -1
 #define RIGHT 1
 
-char FIELD[FIELD_HEIGHT][FIELD_WIDTH];
 char CURRENT_KEY = -1;
 
 int VERTICAL_SPEED = DOWN;
@@ -142,7 +142,14 @@ void move_snake(struct SnakeNode *snake, struct Food *food, int max_height, int 
     }
 }
 
-bool is_colised(struct SnakeNode *s) {
+void grow_snake(struct SnakeNode *s, int max_height, int max_width) {
+    struct SnakeNode *tmp = s->next;
+    s->next = new_node(s->pos.x, s->pos.y, false);
+    s->next->next = tmp;
+    move_head(s, max_height, max_width);
+}
+
+bool is_collided(struct SnakeNode *s) {
     struct SnakeNode *head = s;
 
     s = s->next;
@@ -153,40 +160,6 @@ bool is_colised(struct SnakeNode *s) {
         if (head->pos.x == s->pos.x && head->pos.y == s->pos.y) return true;
 
         s = s->next;
-    }
-}
-
-void cleanup_field() {
-    for (int i = 0; i < FIELD_HEIGHT; i++) {
-        for (int j = 0; j < FIELD_WIDTH; j++) {
-            FIELD[i][j] = ' ';
-        }
-    }
-}
-
-void put_snake(struct SnakeNode *snake) {
-    while (true) {
-        if (snake == NULL) return;
-
-        if (snake->is_head) {
-            FIELD[snake->pos.y][snake->pos.x] = '@';
-        } else {
-            FIELD[snake->pos.y][snake->pos.x] = '#';
-        }
-
-        snake = snake->next;
-    }
-}
-
-void put_food(struct Food *food) {
-    FIELD[food->pos.y][food->pos.x] = '0';
-}
-
-void draw_field(int w, int h) {
-    for (int i = 0; i < h; i++) {
-        for (int j = 0; j < w; j++) {
-            addch(FIELD[i][j]);
-        }
     }
 }
 
@@ -208,17 +181,11 @@ void *listen_keys() {
 }
 
 void game_over(int w, int h) {
-    cleanup_field();
     nodelay(stdscr, false);
     char *msg = "Game Over";
 
     uint8_t score_cap = 9;
     char scr[score_cap];
-
-    size_t msg_len = strlen(msg);
-    for (size_t i = msg_len; i > 0; i--) {
-        FIELD[h / 2][(w / 2) - i] = msg[msg_len - i];
-    }
 
     if (SCORE < 10) {
         sprintf(scr, "score: 0%d", SCORE);
@@ -226,24 +193,40 @@ void game_over(int w, int h) {
         sprintf(scr, "score: %d", SCORE);
     }
 
-    for (size_t i = score_cap; i > 0; i--) {
-        FIELD[(h / 2) + 1][(w / 2) - i] = scr[score_cap - i];
-    }
-
 
     clear();
-    draw_field(w, h);
+    mvaddstr(h / 2, (w / 2) - strlen(msg), msg);
+    mvaddstr((h / 2) + 1, (w / 2) - strlen(scr), scr);
     refresh();
     getch();
 }
 
+void draw_snake(struct SnakeNode *s) {
+    char ch;
+    while (true) {
+        if (s == NULL) return;
 
-int main(void) {
+        ch = BODY_CH;
+        if (s->is_head) {
+            ch = HEAD_CH;
+        }
+
+        mvaddch(s->pos.y, s->pos.x, ch);
+
+        s = s->next;
+    }
+}
+
+void draw_food(struct Food *f) {
+    mvaddch(f->pos.y, f->pos.x, FOOD_CH);
+}
+
+
+int main() {
+    int x, y;
     struct Food *food = (struct Food *) malloc(sizeof(struct Food));
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w); // Init window resolution
-
-    int x, y;
 
     x = (int) (w.ws_col / 2);
     y = (int) (w.ws_row / 2);
@@ -271,6 +254,7 @@ int main(void) {
     // ---------
 
     while (true) {
+        // Handle keys
         switch (CURRENT_KEY) {
             case 'q':
                 goto end;
@@ -302,33 +286,39 @@ int main(void) {
                 break;
         }
 
+        // ---------------
+
+        // handle logic
+
+        // move snake
         move_snake(snake, food, w.ws_row, w.ws_col);
-        if (is_colised(snake)) {
+        if (is_collided(snake)) { // if it's collided itself - game over
             game_over(w.ws_col, w.ws_row);
             goto end;
         }
 
-        if (snake->pos.x == food->pos.x && snake->pos.y == food->pos.y) {
-            SCORE++;
+        if (snake->pos.x == food->pos.x && snake->pos.y == food->pos.y) { // if head is on food position
+            SCORE++; // Increase score
 
-            generate_food(snake, food, w.ws_col, w.ws_row);
-
-            struct SnakeNode *tmp = snake->next;
-            snake->next = new_node(snake->pos.x, snake->pos.y, false);
-            snake->next->next = tmp;
-            move_head(snake, w.ws_row, w.ws_col);
+            generate_food(snake, food, w.ws_col, w.ws_row); // Regenerate food
+            grow_snake(snake, w.ws_row, w.ws_col);
         }
 
+        // ---------------------
+
+        // Draw
         clear();
 
-        cleanup_field();
-        put_food(food);
-        put_snake(snake);
-        draw_field(w.ws_col, w.ws_row);
+        draw_food(food);
+        draw_snake(snake);
 
         refresh();
 
+        // ------------------------
+
+        // Sleep
         usleep((int) (5 * (pow(10, 5))));
+        // -------------------------
     }
     end:
     endwin();
